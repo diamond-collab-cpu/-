@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Голосование Студсовета</title>
+    <style>
+        :root {
+            --bg-color: #F2F2F7;
+            --card-bg: #FFFFFF;
+            --text-main: #000000;
+            --text-secondary: #8E8E93;
+            --accent-blue: #007AFF;
+            --destructive-red: #FF3B30;
+            --separator: #C6C6C8;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background-color: var(--bg-color); color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            padding-bottom: 80px;
+        }
+
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 34px; font-weight: 700; margin-bottom: 20px; }
+        h2 { font-size: 22px; font-weight: 600; margin-top: 20px; margin-bottom: 12px; }
+        
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* Элементы форм в стиле iOS 17 */
+        .ios-form { background: var(--card-bg); border-radius: 12px; padding: 4px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .ios-input-group { display: flex; align-items: center; border-bottom: 0.5px solid var(--separator); padding: 12px 0; }
+        .ios-input-group:last-child { border-bottom: none; }
+        .ios-input-group label { width: 100px; font-size: 17px; }
+        .ios-input-group input, .ios-input-group select { flex: 1; border: none; outline: none; font-size: 17px; background: transparent; }
+        
+        .ios-btn { display: block; width: 100%; background: var(--accent-blue); color: white; border: none; border-radius: 12px; padding: 14px; font-size: 17px; font-weight: 600; cursor: pointer; text-align: center; box-sizing: border-box; }
+        .ios-btn.secondary { background: none; color: var(--accent-blue); margin-top: 10px; font-weight: 400; }
+        .ios-btn.destructive { background: var(--destructive-red); }
+
+        /* Карточки кандидатов */
+        .candidate-list { display: flex; flex-direction: column; gap: 12px; }
+        .candidate-card { background: var(--card-bg); border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .candidate-info { display: flex; align-items: center; gap: 15px; }
+        .avatar { width: 50px; height: 50px; border-radius: 25px; background: #E5E5EA; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .details { display: flex; flex-direction: column; }
+        .name { font-size: 17px; font-weight: 600; }
+        .manifesto { font-size: 13px; color: var(--text-secondary); }
+        .vote-btn { background: var(--accent-blue); color: white; border: none; border-radius: 16px; padding: 8px 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
+
+        /* Результаты голосования */
+        .results-card { background: var(--card-bg); border-radius: 16px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 14px; }
+        .result-row { display: flex; flex-direction: column; gap: 4px; }
+        .result-info { display: flex; justify-content: space-between; font-size: 15px; font-weight: 500; }
+        .progress-bar-bg { background: #E5E5EA; height: 8px; border-radius: 4px; overflow: hidden; }
+        .progress-bar-fill { background: var(--accent-blue); height: 100%; width: 0%; transition: width 0.5s ease-out; }
+
+        /* Нижний таб-бар навигации */
+        .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: rgba(255, 255, 255, 0.94); border-top: 0.5px solid var(--separator); display: flex; justify-content: space-around; align-items: center; backdrop-filter: blur(20px); display: none; }
+        .tab-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--text-secondary); cursor: pointer; background: none; border: none; }
+        .tab-item.active { color: var(--accent-blue); }
+        .tab-icon { font-size: 22px; margin-bottom: 2px; }
+
+        .audit-log { background: var(--card-bg); border-radius: 16px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-height: 180px; overflow-y: auto; font-family: monospace; font-size: 11px; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="screen-auth" class="screen active">
+        <h1 id="auth-title">Вход</h1>
+        <div class="ios-form">
+            <div class="ios-input-group">
+                <label>Логин</label>
+                <input type="text" id="auth-user" placeholder="Имя пользователя">
+            </div>
+            <div class="ios-input-group">
+                <label>Пароль</label>
+                <input type="password" id="auth-pass" placeholder="Пароль">
+            </div>
+            <div class="ios-input-group" id="role-group" style="display:none;">
+                <label>Роль</label>
+                <select id="auth-role">
+                    <option value="student">Студент</option>
+                    <option value="admin">Администратор</option>
+                </select>
+            </div>
+        </div>
+        <button class="ios-btn" onclick="handleAuth()" id="auth-main-btn">Войти</button>
+        <button class="ios-btn secondary" onclick="toggleAuthMode()" id="auth-toggle-btn">Создать аккаунт</button>
+    </div>
+
+    <div id="screen-vote" class="screen">
+        <h1>Голосование</h1>
+        <h2>Кандидаты студсовета</h2>
+        <div class="candidate-list" id="vote-candidates-container"></div>
+    </div>
+
+    <div id="screen-results" class="screen">
+        <h1>Результаты</h1>
+        <h2>Текущий подсчет</h2>
+        <div class="results-card" id="results-container"></div>
+        <h2>Лог аудита (Криптография)</h2>
+        <div class="audit-log" id="audit-container"></div>
+    </div>
+
+    <div id="screen-admin" class="screen">
+        <h1>Управление</h1>
+        <h2>Добавить кандидата</h2>
+        <div class="ios-form">
+            <div class="ios-input-group">
+                <label>ФИО</label>
+                <input type="text" id="admin-cand-name" placeholder="Имя кандидата">
+            </div>
+            <div class="ios-input-group">
+                <label>Манифест</label>
+                <input type="text" id="admin-cand-manifesto" placeholder="Программа развития">
+            </div>
+            <div class="ios-input-group">
+                <label>Эмодзи</label>
+                <input type="text" id="admin-cand-icon" placeholder="🙋‍♂️" value="🙋‍♂️">
+            </div>
+        </div>
+        <button class="ios-btn" onclick="addCandidate()">Добавить в бюллетень</button>
+
+        <h2>Список кандидатов</h2>
+        <div class="candidate-list" id="admin-candidates-container"></div>
+        
+        <h2>Опасная зона</h2>
+        <button class="ios-btn destructive" onclick="resetVotes()">Сбросить все голоса</button>
+    </div>
+</div>
+
+<div class="tab-bar" id="app-tab-bar">
+    <button class="tab-item active" onclick="switchTab('vote')"><div class="tab-icon">🗳️</div>Голосовать</button>
+    <button class="tab-item" onclick="switchTab('results')"><div class="tab-icon">📊</div>Результаты</button>
+    <button class="tab-item" id="tab-admin-item" style="display:none;" onclick="switchTab('admin')"><div class="tab-icon">⚙️</div>Админ</button>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:3000/api';
+    let currentUser = null;
+    let isRegisterMode = false;
+
+    async function generateHash(message) {
+        const msgBuffer = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function toggleAuthMode() {
+        isRegisterMode = !isRegisterMode;
+        document.getElementById('auth-title').innerText = isRegisterMode ? 'Регистрация' : 'Вход';
+        document.getElementById('auth-main-btn').innerText = isRegisterMode ? 'Зарегистрироваться' : 'Войти';
+        document.getElementById('auth-toggle-btn').innerText = isRegisterMode ? 'Уже есть аккаунт?' : 'Создать аккаунт';
+        document.getElementById('role-group').style.display = isRegisterMode ? 'flex' : 'none';
+    }
+
+    async function handleAuth() {
+        const username = document.getElementById('auth-user').value.trim();
+        const password = document.getElementById('auth-pass').value.trim();
+        const role = document.getElementById('auth-role').value;
+
+        if (!username || !password) {
+            alert('Пожалуйста, заполните логин и пароль!');
+            return;
+        }
+
+        const endpoint = isRegisterMode ? '/auth/register' : '/auth/login';
+        const body = isRegisterMode ? { username, password, role } : { username, password };
+
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                if (isRegisterMode) {
+                    alert('Регистрация завершена! Войдите в аккаунт.');
+                    toggleAuthMode();
+                } else {
+                    currentUser = data;
+                    document.getElementById('screen-auth').classList.remove('active');
+                    document.getElementById('app-tab-bar').style.display = 'flex';
+                    if (currentUser.role === 'admin') document.getElementById('tab-admin-item').style.display = 'flex';
+                    switchTab('vote');
+                }
+            } else {
+                alert(data.error || 'Ошибка авторизации');
+            }
+        } catch (err) {
+            alert('Ошибка связи с сервером Node.js. Проверьте консоль.');
+        }
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        
+        const targetScreen = document.getElementById(`screen-${tabName}`);
+        if (targetScreen) targetScreen.classList.add('active');
+
+        const tabs = document.querySelectorAll('.tab-item');
+        if (tabName === 'vote') tabs[0].classList.add('active');
+        if (tabName === 'results') tabs[1].classList.add('active');
+        if (tabName === 'admin') tabs[2].classList.add('active');
+
+        if (tabName === 'vote') loadVoteCandidates();
+        if (tabName === 'results') { loadResults(); loadAuditLog(); }
+        if (tabName === 'admin') loadAdminCandidates();
+    }
+
+    async function loadVoteCandidates() {
+        const response = await fetch(`${API_URL}/candidates`);
+        const list = await response.json();
+        const container = document.getElementById('vote-candidates-container');
+        container.innerHTML = list.length === 0 ? '<div style="color:var(--text-secondary);">Список бюллетеней пуст. Зайдите под админом, чтобы добавить кандидатов.</div>' : '';
+        list.forEach(c => {
+            const card = document.createElement('div');
+            card.className = 'candidate-card';
+            card.innerHTML = `
+                <div class="candidate-info">
+                    <div class="avatar">${c.icon}</div>
+                    <div class="details"><span class="name">${c.name}</span><span class="manifesto">${c.manifesto}</span></div>
+                </div>
+                <button class="vote-btn" onclick="castVote('${c._id}', '${c.name}')">Голосовать</button>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    async function castVote(candidateId, name) {
+        if (!confirm(`Подтвердите ваш криптографический голос за: ${name}`)) return;
+        const timestamp = new Date().toISOString();
+        const salt = Math.random().toString(36).substring(2, 15);
+        const hash = await generateHash(`Vote:${candidateId}|Time:${timestamp}|Salt:${salt}`);
+
+        const response = await fetch(`${API_URL}/vote`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hash, timestamp, candidateId })
+        });
+        if (response.ok) alert('Голос защищен шифрованием и зафиксирован в MongoDB!');
+    }
+
+    async function loadResults() {
+        const response = await fetch(`${API_URL}/results`);
+        const data = await response.json();
+        const container = document.getElementById('results-container');
+        container.innerHTML = data.results.length === 0 ? '<div style="color:var(--text-secondary);">Нет кандидатов для отображения результатов.</div>' : '';
+        data.results.forEach(r => {
+            const row = document.createElement('div');
+            row.className = 'result-row';
+            row.innerHTML = `
+                <div class="result-info"><span>${r.icon} ${r.name}</span><span>${r.votes} голос. (${r.percentage}%)</span></div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: ${r.percentage}%"></div></div>
+            `;
+            container.appendChild(row);
+        });
+    }
+
+    async function loadAuditLog() {
+        const response = await fetch(`${API_URL}/audit`);
+        const votes = await response.json();
+        const container = document.getElementById('audit-container');
+        container.innerHTML = votes.length === 0 ? 'БД пуста.' : votes.map(v => `<div>[УЧТЕНО] ${v.timestamp}<br>Хэш: ${v.hash}</div><hr style="border:none;border-bottom:0.5px solid var(--separator);">`).join('');
+    }
+
+    async function loadAdminCandidates() {
+        const response = await fetch(`${API_URL}/candidates`);
+        const list = await response.json();
+        const container = document.getElementById('admin-candidates-container');
+        container.innerHTML = '';
+        list.forEach(c => {
+            const card = document.createElement('div');
+            card.className = 'candidate-card';
+            card.innerHTML = `
+                <div class="candidate-info">
+                    <div class="avatar">${c.icon}</div>
+                    <div class="details"><span class="name">${c.name}</span></div>
+                </div>
+                <button class="vote-btn" style="background:var(--destructive-red);" onclick="deleteCandidate('${c._id}')">Удалить</button>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    async function addCandidate() {
+        const name = document.getElementById('admin-cand-name').value.trim();
+        const manifesto = document.getElementById('admin-cand-manifesto').value.trim();
+        const icon = document.getElementById('admin-cand-icon').value.trim();
+
+        if(!name || !manifesto) { alert('Заполните ФИО и манифест!'); return; }
+
+        await fetch(`${API_URL}/candidates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, manifesto, icon })
+        });
+        
+        document.getElementById('admin-cand-name').value = '';
+        document.getElementById('admin-cand-manifesto').value = '';
+        loadAdminCandidates();
+    }
+
+    async function deleteCandidate(id) {
+        await fetch(`${API_URL}/candidates/${id}`, { method: 'DELETE' });
+        loadAdminCandidates();
+    }
+
+    async function resetVotes() {
+        if (confirm('Сбросить данные голосования?')) {
+            await fetch(`${API_URL}/reset`, { method: 'DELETE' });
+            alert('Голосование сброшено');
+        }
+    }
+</script>
+</body>
+</html>
